@@ -32,6 +32,24 @@ class ArgusConfig private constructor(
         fun enableCrashReporting(enable: Boolean) = apply { this.enableCrashReporting = enable }
         fun enableShakeToDiagnose(enable: Boolean) = apply { this.enableShakeToDiagnose = enable }
 
+        /** Convenient shortcut to configure Anthropic Claude as diagnostic agent */
+        fun useClaude(key: String) = apply {
+            this.aiProvider = "claude"
+            this.apiKey = key
+        }
+
+        /** Convenient shortcut to configure OpenAI ChatGPT / Codex as diagnostic agent */
+        fun useOpenAi(key: String) = apply {
+            this.aiProvider = "openai"
+            this.apiKey = key
+        }
+
+        /** Convenient shortcut to configure Google Gemini as diagnostic agent */
+        fun useGemini(key: String) = apply {
+            this.aiProvider = "gemini"
+            this.apiKey = key
+        }
+
         fun build() = ArgusConfig(
             appVersion = appVersion,
             apiKey = apiKey,

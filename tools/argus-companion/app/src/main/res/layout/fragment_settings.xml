@@ -112,7 +112,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Gemini AI Diagnostician"
+                    android:text="AI Diagnostician Engine"
                     android:textColor="@color/argus_text_primary"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -121,15 +121,49 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="Provide your Gemini API key to enable multi-turn causal reasoning for complex or silent application bugs."
+                    android:text="Choose your preferred AI agent provider for root-cause synthesis."
                     android:textColor="@color/argus_text_secondary"
                     android:textSize="12sp" />
 
+                <RadioGroup
+                    android:id="@+id/rgAiProvider"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="vertical">
+
+                    <RadioButton
+                        android:id="@+id/rbProviderGemini"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:text="Google Gemini (Flash 2.5 / 2.0)"
+                        android:textColor="@color/argus_text_primary"
+                        android:textSize="13sp" />
+
+                    <RadioButton
+                        android:id="@+id/rbProviderClaude"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Anthropic Claude (3.7 / 3.5 Sonnet)"
+                        android:textColor="@color/argus_text_primary"
+                        android:textSize="13sp" />
+
+                    <RadioButton
+                        android:id="@+id/rbProviderOpenAi"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="OpenAI ChatGPT / Codex (GPT-4o)"
+                        android:textColor="@color/argus_text_primary"
+                        android:textSize="13sp" />
+                </RadioGroup>
+
                 <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/tilApiKey"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:hint="@string/hint_api_key"
+                    android:hint="Gemini API Key"
                     app:boxBackgroundColor="@color/argus_card"
                     app:boxStrokeColor="@color/argus_accent"
                     app:hintTextColor="@color/argus_accent"

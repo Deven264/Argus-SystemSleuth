@@ -28,8 +28,20 @@ class SettingsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         val prefs = requireContext().getSharedPreferences("argus_prefs", Context.MODE_PRIVATE)
-        val savedKey = prefs.getString("gemini_api_key", "")
-        binding.etSettingsApiKey.setText(savedKey)
+        val savedProvider = prefs.getString("selected_ai_provider", "gemini") ?: "gemini"
+
+        // Set radio button based on saved provider
+        when (savedProvider) {
+            "claude" -> binding.rbProviderClaude.isChecked = true
+            "openai" -> binding.rbProviderOpenAi.isChecked = true
+            else -> binding.rbProviderGemini.isChecked = true
+        }
+
+        updateUiForSelectedProvider(getCurrentSelectedProvider(), prefs)
+
+        binding.rgAiProvider.setOnCheckedChangeListener { _, _ ->
+            updateUiForSelectedProvider(getCurrentSelectedProvider(), prefs)
+        }
 
         binding.btnOpenAccessibilitySettings.setOnClickListener {
             val activity = requireActivity() as? MainActivity
@@ -37,14 +49,52 @@ class SettingsFragment : Fragment() {
         }
 
         binding.btnSaveApiKey.setOnClickListener {
+            val provider = getCurrentSelectedProvider()
             val key = binding.etSettingsApiKey.text?.toString()?.trim() ?: ""
-            prefs.edit().putString("gemini_api_key", key).apply()
+
+            val keyPrefName = when (provider) {
+                "claude" -> "claude_api_key"
+                "openai" -> "openai_api_key"
+                else -> "gemini_api_key"
+            }
+
+            prefs.edit()
+                .putString("selected_ai_provider", provider)
+                .putString(keyPrefName, key)
+                .apply()
+
+            val providerName = when (provider) {
+                "claude" -> "Anthropic Claude"
+                "openai" -> "OpenAI ChatGPT"
+                else -> "Google Gemini"
+            }
+
             Toast.makeText(
                 requireContext(),
-                if (key.isNotBlank()) "Gemini API key saved successfully!" else "API key cleared. Offline heuristic mode active.",
+                if (key.isNotBlank()) "$providerName API key saved!" else "$providerName key cleared. Offline heuristic mode active.",
                 Toast.LENGTH_SHORT
             ).show()
         }
+    }
+
+    private fun getCurrentSelectedProvider(): String {
+        return when (binding.rgAiProvider.checkedRadioButtonId) {
+            R.id.rbProviderClaude -> "claude"
+            R.id.rbProviderOpenAi -> "openai"
+            else -> "gemini"
+        }
+    }
+
+    private fun updateUiForSelectedProvider(provider: String, prefs: android.content.SharedPreferences) {
+        val (hintText, keyPrefName) = when (provider) {
+            "claude" -> Pair("Anthropic Claude API Key (sk-ant-...)", "claude_api_key")
+            "openai" -> Pair("OpenAI API Key (sk-...)", "openai_api_key")
+            else -> Pair("Google Gemini API Key (AI Studio)", "gemini_api_key")
+        }
+
+        binding.tilApiKey.hint = hintText
+        val savedKey = prefs.getString(keyPrefName, "") ?: ""
+        binding.etSettingsApiKey.setText(savedKey)
     }
 
     override fun onDestroyView() {

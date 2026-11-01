@@ -71,7 +71,12 @@ class DiagnoseFragment : Fragment() {
 
     private fun performDiagnosis(complaint: String) {
         val prefs = requireContext().getSharedPreferences("argus_prefs", Context.MODE_PRIVATE)
-        val apiKey = prefs.getString("gemini_api_key", null)
+        val provider = prefs.getString("selected_ai_provider", "gemini") ?: "gemini"
+        val apiKey = when {
+            provider.contains("claude") -> prefs.getString("claude_api_key", null)
+            provider.contains("openai") || provider.contains("chatgpt") -> prefs.getString("openai_api_key", null)
+            else -> prefs.getString("gemini_api_key", null)
+        }
 
         binding.btnDiagnose.isEnabled = false
         binding.btnDiagnose.text = getString(R.string.btn_diagnosing)
@@ -88,7 +93,8 @@ class DiagnoseFragment : Fragment() {
                 val result = GeminiDiagnosticEngine.diagnose(
                     userComplaint = complaint,
                     events = snapshotEvents,
-                    apiKey = apiKey
+                    apiKey = apiKey,
+                    provider = provider
                 )
 
                 lastDiagnosisResult = result

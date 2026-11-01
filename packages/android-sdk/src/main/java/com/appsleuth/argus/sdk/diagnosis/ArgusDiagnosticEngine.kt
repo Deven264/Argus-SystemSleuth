@@ -1,21 +1,33 @@
 package com.appsleuth.argus.sdk.diagnosis
 
 import com.appsleuth.argus.sdk.diagnosis.provider.AiProvider
+import com.appsleuth.argus.sdk.diagnosis.provider.ClaudeProvider
 import com.appsleuth.argus.sdk.diagnosis.provider.GeminiProvider
+import com.appsleuth.argus.sdk.diagnosis.provider.OpenAiProvider
 import com.appsleuth.argus.sdk.graph.ArgusGraphBuilder
 import com.appsleuth.argus.sdk.graph.JourneyGraph
 import com.appsleuth.argus.sdk.model.Outcome
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/**
+ * Multi-Provider AI Diagnostic Engine.
+ * Supports Gemini, Anthropic Claude, and OpenAI ChatGPT/Codex with seamless offline heuristic fallback.
+ */
 object ArgusDiagnosticEngine {
 
     private val providers = mutableMapOf<String, AiProvider>(
-        "gemini" to GeminiProvider()
+        "gemini" to GeminiProvider(),
+        "google" to GeminiProvider(),
+        "claude" to ClaudeProvider(),
+        "anthropic" to ClaudeProvider(),
+        "openai" to OpenAiProvider(),
+        "chatgpt" to OpenAiProvider(),
+        "codex" to OpenAiProvider()
     )
 
     fun registerProvider(provider: AiProvider) {
-        providers[provider.providerId] = provider
+        providers[provider.providerId.lowercase()] = provider
     }
 
     suspend fun diagnose(
@@ -25,7 +37,9 @@ object ArgusDiagnosticEngine {
         apiKey: String? = null
     ): DiagnosisResult = withContext(Dispatchers.IO) {
         if (!apiKey.isNullOrBlank()) {
-            val provider = providers[providerId] ?: providers["gemini"]
+            val normalizedKey = providerId.lowercase().trim()
+            val provider = providers[normalizedKey] ?: providers["gemini"]
+
             if (provider != null) {
                 try {
                     val context = ArgusGraphBuilder.toPromptContext(graph)
