@@ -15,14 +15,63 @@ let layoutEdges = [];
 let flightRecorderTrace = [];
 let latestIncidentReport = null;
 
-// Fallback Model Candidate Hierarchy
-const CANDIDATE_FLASH_MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash-latest',
-  'gemini-1.5-flash-8b',
-  'gemini-1.5-flash'
-];
+// AI Provider Registry & Model Hierarchies
+const PROVIDER_CONFIG = {
+  gemini: {
+    id: 'gemini',
+    name: 'Google Gemini',
+    shortName: 'Gemini',
+    label: 'Google Gemini API Key (Optional for Deep AI):',
+    placeholder: 'AIzaSy... (Leave empty for instant offline engine)',
+    hint: 'Google Gemini 2.5/2.0 Flash models provide ultra-fast multimodal reasoning and graph synthesis.',
+    storageKey: 'geminiApiKey',
+    candidateModels: [
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash-latest',
+      'gemini-1.5-flash-8b',
+      'gemini-1.5-flash'
+    ]
+  },
+  claude: {
+    id: 'claude',
+    name: 'Anthropic Claude',
+    shortName: 'Claude',
+    label: 'Anthropic Claude API Key (Optional for Deep AI):',
+    placeholder: 'sk-ant-api03-... (Leave empty for instant offline engine)',
+    hint: 'Anthropic Claude 3.7 / 3.5 Sonnet excels at forensic root cause identification and state machine synthesis.',
+    storageKey: 'claudeApiKey',
+    candidateModels: [
+      'claude-3-7-sonnet-20250219',
+      'claude-3-5-sonnet-20241022',
+      'claude-3-5-haiku-20241022'
+    ]
+  },
+  openai: {
+    id: 'openai',
+    name: 'OpenAI ChatGPT / Codex',
+    shortName: 'ChatGPT',
+    label: 'OpenAI API Key (Optional for Deep AI):',
+    placeholder: 'sk-proj-... (Leave empty for instant offline engine)',
+    hint: 'OpenAI GPT-4o / GPT-4o-mini provides high reliability JSON mode and systems architecture diagnostics.',
+    storageKey: 'openaiApiKey',
+    candidateModels: [
+      'gpt-4o',
+      'gpt-4o-mini',
+      'gpt-4-turbo'
+    ]
+  }
+};
+
+let currentAiProvider = 'gemini';
+let savedApiKeys = {
+  gemini: '',
+  claude: '',
+  openai: ''
+};
+
+// Fallback Model Candidate Hierarchy (Gemini)
+const CANDIDATE_FLASH_MODELS = PROVIDER_CONFIG.gemini.candidateModels;
 
 // DOM Elements: Header & Setup
 const pageTitleEl = document.getElementById('pageTitle');
@@ -31,9 +80,12 @@ const btnCountEl = document.getElementById('btnCount');
 const formCountEl = document.getElementById('formCount');
 const endpointCountEl = document.getElementById('endpointCount');
 const modelBadgeEl = document.getElementById('modelBadge');
+const aiProviderSelect = document.getElementById('aiProviderSelect');
+const apiKeyLabel = document.getElementById('apiKeyLabel');
 const apiKeyInput = document.getElementById('apiKeyInput');
 const saveKeyBtn = document.getElementById('saveKeyBtn');
 const synthesisModeSelect = document.getElementById('synthesisMode');
+const settingsHint = document.getElementById('settingsHint');
 const apiStatusNotice = document.getElementById('apiStatusNotice');
 const generateBtn = document.getElementById('generateBtn');
 const genSpinner = document.getElementById('genSpinner');
@@ -82,16 +134,32 @@ const refreshTraceBtn = document.getElementById('refreshTraceBtn');
 document.addEventListener('DOMContentLoaded', async () => {
   // Load saved settings from chrome.storage
   if (chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['geminiApiKey', 'synthesisMode'], (res) => {
-      if (res && res.geminiApiKey) {
-        apiKeyInput.value = res.geminiApiKey;
-        updateEngineBadge(true);
-      } else {
-        updateEngineBadge(false);
+    chrome.storage.local.get(['selectedAiProvider', 'geminiApiKey', 'claudeApiKey', 'openaiApiKey', 'synthesisMode'], (res) => {
+      if (res) {
+        if (res.selectedAiProvider && PROVIDER_CONFIG[res.selectedAiProvider]) {
+          currentAiProvider = res.selectedAiProvider;
+          if (aiProviderSelect) aiProviderSelect.value = currentAiProvider;
+        }
+        if (res.geminiApiKey) savedApiKeys.gemini = res.geminiApiKey;
+        if (res.claudeApiKey) savedApiKeys.claude = res.claudeApiKey;
+        if (res.openaiApiKey) savedApiKeys.openai = res.openaiApiKey;
+        if (res.synthesisMode && synthesisModeSelect) {
+          synthesisModeSelect.value = res.synthesisMode;
+        }
       }
+      updateProviderUI();
+    });
+  } else {
+    updateProviderUI();
+  }
 
-      if (res && res.synthesisMode && synthesisModeSelect) {
-        synthesisModeSelect.value = res.synthesisMode;
+  // Handle provider switch
+  if (aiProviderSelect) {
+    aiProviderSelect.addEventListener('change', () => {
+      currentAiProvider = aiProviderSelect.value;
+      updateProviderUI();
+      if (chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({ selectedAiProvider: currentAiProvider });
       }
     });
   }
@@ -100,8 +168,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   saveKeyBtn.addEventListener('click', () => {
     const key = apiKeyInput.value.trim();
     const mode = synthesisModeSelect ? synthesisModeSelect.value : 'deep';
+    savedApiKeys[currentAiProvider] = key;
+    const cfg = PROVIDER_CONFIG[currentAiProvider] || PROVIDER_CONFIG.gemini;
+    const toSave = {
+      selectedAiProvider: currentAiProvider,
+      [cfg.storageKey]: key,
+      synthesisMode: mode
+    };
     if (chrome.storage && chrome.storage.local) {
-      chrome.storage.local.set({ geminiApiKey: key, synthesisMode: mode }, () => {
+      chrome.storage.local.set(toSave, () => {
         saveKeyBtn.innerText = '✓ Saved!';
         updateEngineBadge(!!key);
         hideApiNotice();
@@ -197,9 +272,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+function updateProviderUI() {
+  const cfg = PROVIDER_CONFIG[currentAiProvider] || PROVIDER_CONFIG.gemini;
+  if (apiKeyLabel) apiKeyLabel.innerText = cfg.label;
+  if (apiKeyInput) {
+    apiKeyInput.placeholder = cfg.placeholder;
+    apiKeyInput.value = savedApiKeys[currentAiProvider] || '';
+  }
+  if (settingsHint) settingsHint.innerText = cfg.hint;
+  updateEngineBadge(!!(savedApiKeys[currentAiProvider]));
+}
+
 function updateEngineBadge(hasKey) {
+  const cfg = PROVIDER_CONFIG[currentAiProvider] || PROVIDER_CONFIG.gemini;
   if (hasKey) {
-    modelBadgeEl.innerText = 'AI Systems Engine (Gemini)';
+    modelBadgeEl.innerText = `AI Engine (${cfg.shortName})`;
     modelBadgeEl.style.color = '#38bdf8';
     modelBadgeEl.style.borderColor = 'rgba(56, 189, 248, 0.4)';
     modelBadgeEl.style.background = 'rgba(56, 189, 248, 0.15)';
@@ -437,13 +524,197 @@ function escapeHtml(str) {
 }
 
 // -------------------------------------------------------------
-// 4. Live Self-Diagnosis Controller & Gemini AI Reasoning
+// 4. Multi-Provider AI Engine (Gemini, Claude, ChatGPT/Codex)
 // -------------------------------------------------------------
-async function diagnoseWithGemini(userComplaint, graph, trace, apiKey) {
-  const discovered = await discoverActiveModel(apiKey);
-  const modelsToTry = discovered 
-    ? [discovered, ...CANDIDATE_FLASH_MODELS.filter(m => m !== discovered)]
-    : CANDIDATE_FLASH_MODELS;
+async function discoverActiveModel(apiKey) {
+  try {
+    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
+    if (listRes.ok) {
+      const data = await listRes.json();
+      if (data && Array.isArray(data.models)) {
+        const supported = data.models.filter(m => 
+          Array.isArray(m.supportedGenerationMethods) && 
+          m.supportedGenerationMethods.includes('generateContent')
+        );
+
+        const preferred = supported.find(m => /2\.5-flash/i.test(m.name))
+          || supported.find(m => /2\.0-flash/i.test(m.name))
+          || supported.find(m => /1\.5-flash-latest/i.test(m.name))
+          || supported.find(m => /1\.5-flash/i.test(m.name))
+          || supported.find(m => /flash/i.test(m.name))
+          || supported[0];
+
+        if (preferred) {
+          const modelId = preferred.name.replace(/^models\//, '');
+          console.log('[Argus] Discovered active model for key:', modelId);
+          return modelId;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Argus] Dynamic model discovery skipped:', err);
+  }
+  return null;
+}
+
+function extractJsonPayload(rawText) {
+  if (typeof rawText !== 'string') return rawText;
+  let cleaned = rawText.trim();
+  if (cleaned.startsWith('```json')) {
+    cleaned = cleaned.replace(/^```json\s*/i, '').replace(/\s*```$/, '');
+  } else if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```\s*/, '').replace(/\s*```$/, '');
+  }
+  return JSON.parse(cleaned.trim());
+}
+
+async function callGeminiGenerate(modelName, prompt, apiKey) {
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        role: 'user',
+        parts: [{ text: prompt }]
+      }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.15
+      }
+    })
+  });
+
+  if (!response.ok) {
+    let errorDetail = response.statusText;
+    try {
+      const errJson = await response.json();
+      if (errJson && errJson.error && errJson.error.message) {
+        errorDetail = errJson.error.message;
+      }
+    } catch (_) {}
+    throw new Error(`Google API returned HTTP ${response.status} for ${modelName}: ${errorDetail}`);
+  }
+
+  const json = await response.json();
+  const rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!rawText) {
+    throw new Error(`Empty response content from ${modelName}`);
+  }
+
+  return extractJsonPayload(rawText);
+}
+
+async function callClaudeGenerate(modelName, prompt, apiKey) {
+  const endpoint = 'https://api.anthropic.com/v1/messages';
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: modelName,
+      max_tokens: 4096,
+      messages: [
+        {
+          role: 'user',
+          content: prompt + '\n\nCRITICAL: Return strictly valid JSON adhering to the specified schema, with no markdown code blocks and no conversational preamble.'
+        }
+      ]
+    })
+  });
+
+  if (!response.ok) {
+    let errorDetail = response.statusText;
+    try {
+      const errJson = await response.json();
+      if (errJson && errJson.error && errJson.error.message) {
+        errorDetail = errJson.error.message;
+      }
+    } catch (_) {}
+    throw new Error(`Anthropic API returned HTTP ${response.status} for ${modelName}: ${errorDetail}`);
+  }
+
+  const json = await response.json();
+  const rawText = json?.content?.[0]?.text;
+  if (!rawText) {
+    throw new Error(`Empty response content from Anthropic (${modelName})`);
+  }
+
+  return extractJsonPayload(rawText);
+}
+
+async function callOpenAiGenerate(modelName, prompt, apiKey) {
+  const endpoint = 'https://api.openai.com/v1/chat/completions';
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: modelName,
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content: 'You are Argus: SystemSleuth\'s Principal Distributed Systems SRE and Behavioral Diagnostician. You always return strictly valid JSON matching the requested schema.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ]
+    })
+  });
+
+  if (!response.ok) {
+    let errorDetail = response.statusText;
+    try {
+      const errJson = await response.json();
+      if (errJson && errJson.error && errJson.error.message) {
+        errorDetail = errJson.error.message;
+      }
+    } catch (_) {}
+    throw new Error(`OpenAI API returned HTTP ${response.status} for ${modelName}: ${errorDetail}`);
+  }
+
+  const json = await response.json();
+  const rawText = json?.choices?.[0]?.message?.content;
+  if (!rawText) {
+    throw new Error(`Empty response content from OpenAI (${modelName})`);
+  }
+
+  return extractJsonPayload(rawText);
+}
+
+async function getCandidateModelsForProvider(provider, apiKey) {
+  const cfg = PROVIDER_CONFIG[provider] || PROVIDER_CONFIG.gemini;
+  if (provider === 'gemini') {
+    const discovered = await discoverActiveModel(apiKey);
+    return discovered 
+      ? [discovered, ...cfg.candidateModels.filter(m => m !== discovered)]
+      : cfg.candidateModels;
+  }
+  return cfg.candidateModels;
+}
+
+async function callAiGenerate(provider, modelName, prompt, apiKey) {
+  if (provider === 'claude') {
+    return await callClaudeGenerate(modelName, prompt, apiKey);
+  } else if (provider === 'openai') {
+    return await callOpenAiGenerate(modelName, prompt, apiKey);
+  } else {
+    return await callGeminiGenerate(modelName, prompt, apiKey);
+  }
+}
+
+async function diagnoseWithAI(provider, userComplaint, graph, trace, apiKey) {
+  const modelsToTry = await getCandidateModelsForProvider(provider, apiKey);
 
   // Extract clean trace events (last 15)
   const cleanTrace = (trace || []).slice(-15).map(e => ({
@@ -501,18 +772,23 @@ Return strictly JSON matching this structure:
   let lastErr = null;
   for (const model of modelsToTry) {
     try {
-      console.log(`[Argus] Diagnosing with model ${model}...`);
-      const diagnosis = await callGeminiGenerate(model, prompt, apiKey);
+      console.log(`[Argus] Diagnosing with ${provider} model ${model}...`);
+      const diagnosis = await callAiGenerate(provider, model, prompt, apiKey);
       if (diagnosis && diagnosis.status) {
-        return { diagnosis, modelUsed: model };
+        return { diagnosis, modelUsed: model, provider };
       }
     } catch (err) {
-      console.warn(`[Argus] Model ${model} failed for diagnosis:`, err);
+      console.warn(`[Argus] ${provider} model ${model} failed for diagnosis:`, err);
       lastErr = err;
     }
   }
 
-  throw lastErr || new Error('All candidate models failed to generate diagnosis.');
+  throw lastErr || new Error(`All candidate ${provider} models failed to generate diagnosis.`);
+}
+
+// Backward compatibility alias
+async function diagnoseWithGemini(userComplaint, graph, trace, apiKey) {
+  return await diagnoseWithAI('gemini', userComplaint, graph, trace, apiKey);
 }
 
 async function onRunDiagnoseClicked() {
@@ -541,16 +817,17 @@ async function onRunDiagnoseClicked() {
       layoutGraph(currentGraph);
     }
 
-    // 3. Check for Gemini API key for Deep AI Reasoning
-    const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+    // 3. Check for API key for Deep AI Reasoning
+    const cfg = PROVIDER_CONFIG[currentAiProvider] || PROVIDER_CONFIG.gemini;
+    const apiKey = savedApiKeys[currentAiProvider] || (apiKeyInput ? apiKeyInput.value.trim() : '');
     let aiResult = null;
 
     if (apiKey) {
       try {
-        diagBtnText.innerText = 'Consulting Gemini AI Diagnostician...';
-        aiResult = await diagnoseWithGemini(userComplaint, currentGraph, trace, apiKey);
+        diagBtnText.innerText = `Consulting ${cfg.shortName} AI Diagnostician...`;
+        aiResult = await diagnoseWithAI(currentAiProvider, userComplaint, currentGraph, trace, apiKey);
       } catch (aiErr) {
-        console.warn('[Argus] Gemini diagnosis failed, falling back to heuristic correlator:', aiErr);
+        console.warn(`[Argus] ${cfg.shortName} diagnosis failed, falling back to heuristic correlator:`, aiErr);
         showApiNotice(`AI Notice: ${aiErr.message} — using built-in correlation engine.`, 'error');
       }
     }
@@ -578,14 +855,14 @@ async function onRunDiagnoseClicked() {
         ? 'HEALTHY EXECUTION ✅' 
         : (isSilent ? 'SILENT UI FAULT ⚠️' : 'DIVERGENCE DETECTED ⚠️');
 
-      diagTimestamp.innerText = `${new Date().toLocaleTimeString()} (${aiResult.modelUsed} AI)`;
+      diagTimestamp.innerText = `${new Date().toLocaleTimeString()} (${aiResult.modelUsed} / ${cfg.shortName})`;
       diagUserExplanation.innerText = diag.plainEnglishExplanation || 'Diagnosis completed.';
       diagDevExplanation.innerText = diag.technicalRootCause || 'Telemetry analyzed.';
       diagRemediationList.innerHTML = (diag.remediation || [])
         .map(r => `<li>${escapeHtml(r)}</li>`)
         .join('');
 
-      latestIncidentReport = `### 🚨 Argus Behavioral Self-Diagnosis Incident Report (${aiResult.modelUsed})
+      latestIncidentReport = `### 🚨 Argus Behavioral Self-Diagnosis Incident Report (${cfg.shortName} / ${aiResult.modelUsed})
 - **URL:** ${activeTabInfo?.url || 'N/A'}
 - **User Complaint:** "${userComplaint}"
 - **Status:** ${diag.status}
@@ -594,7 +871,7 @@ async function onRunDiagnoseClicked() {
 - **Root Cause (Technical):** ${diag.technicalRootCause}
 - **Remediation:**
 ${(diag.remediation || []).map(r => `  * ${r}`).join('\n')}
-- **Diagnosed By:** Gemini AI Engine via Argus SystemSleuth 1.0`;
+- **Diagnosed By:** ${cfg.name} (${aiResult.modelUsed}) via Argus SystemSleuth 1.0`;
 
     } else {
       // Deterministic Local Heuristic Correlator
@@ -727,7 +1004,8 @@ async function onGenerateClicked() {
   genBtnText.innerText = 'Deconstructing Full-Stack Architecture...';
   hideApiNotice();
 
-  const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+  const cfg = PROVIDER_CONFIG[currentAiProvider] || PROVIDER_CONFIG.gemini;
+  const apiKey = savedApiKeys[currentAiProvider] || (apiKeyInput ? apiKeyInput.value.trim() : '');
   const mode = synthesisModeSelect ? synthesisModeSelect.value : 'deep';
 
   try {
@@ -737,17 +1015,17 @@ async function onGenerateClicked() {
     if (apiKey) {
       try {
         genBtnText.innerText = mode === 'deep' 
-          ? 'Pass 1/2: Grounding in Runtime Trace & Synthesizing Edge Cases...' 
-          : 'Consulting Gemini Systems Architect...';
+          ? `Pass 1/2: Grounding in Runtime Trace (${cfg.shortName})...` 
+          : `Consulting ${cfg.shortName} Systems Architect...`;
         
-        const synthesisResult = await synthesizeWithGemini(extractedEvidence, apiKey, mode, trace);
+        const synthesisResult = await synthesizeWithAI(currentAiProvider, extractedEvidence, apiKey, mode, trace);
         if (synthesisResult && synthesisResult.graph && synthesisResult.graph.workflows) {
           graph = synthesisResult.graph;
           modelUsed = synthesisResult.modelUsed;
-          showApiNotice(`Synthesized via ${modelUsed} with full distributed edge-case coverage (${mode === 'deep' ? '2 Passes' : '1 Pass'})`, 'success');
+          showApiNotice(`Synthesized via ${cfg.shortName} (${modelUsed}) with full distributed edge-case coverage (${mode === 'deep' ? '2 Passes' : '1 Pass'})`, 'success');
         }
       } catch (llmErr) {
-        console.warn('Gemini synthesis failed, falling back to heuristic synthesizer:', llmErr);
+        console.warn(`${cfg.shortName} synthesis failed, falling back to heuristic synthesizer:`, llmErr);
         showApiNotice(`AI Notice: ${llmErr.message} — used built-in edge-case engine.`, 'error');
       }
     }
@@ -782,7 +1060,7 @@ async function onGenerateClicked() {
     }
 
     if (modelUsed) {
-      modelBadgeEl.innerText = `${modelUsed} ✨`;
+      modelBadgeEl.innerText = `${cfg.shortName}: ${modelUsed} ✨`;
       modelBadgeEl.style.color = '#38bdf8';
     } else if (apiKey) {
       modelBadgeEl.innerText = 'Built-in (Fallback from AI)';
@@ -803,92 +1081,21 @@ async function onGenerateClicked() {
 }
 
 // -------------------------------------------------------------
-// 6. Dynamic Model Discovery & Full-Stack SRE Gemini Synthesis
+// 6. Multi-Provider Full-Stack SRE Journey Synthesis
 // -------------------------------------------------------------
-async function discoverActiveModel(apiKey) {
-  try {
-    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
-    if (listRes.ok) {
-      const data = await listRes.json();
-      if (data && Array.isArray(data.models)) {
-        const supported = data.models.filter(m => 
-          Array.isArray(m.supportedGenerationMethods) && 
-          m.supportedGenerationMethods.includes('generateContent')
-        );
-
-        const preferred = supported.find(m => /2\.5-flash/i.test(m.name))
-          || supported.find(m => /2\.0-flash/i.test(m.name))
-          || supported.find(m => /1\.5-flash-latest/i.test(m.name))
-          || supported.find(m => /1\.5-flash/i.test(m.name))
-          || supported.find(m => /flash/i.test(m.name))
-          || supported[0];
-
-        if (preferred) {
-          const modelId = preferred.name.replace(/^models\//, '');
-          console.log('[Argus] Discovered active model for key:', modelId);
-          return modelId;
-        }
-      }
-    }
-  } catch (err) {
-    console.warn('[Argus] Dynamic model discovery skipped:', err);
-  }
-  return null;
-}
-
-async function callGeminiGenerate(modelName, prompt, apiKey) {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        role: 'user',
-        parts: [{ text: prompt }]
-      }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.15
-      }
-    })
-  });
-
-  if (!response.ok) {
-    let errorDetail = response.statusText;
-    try {
-      const errJson = await response.json();
-      if (errJson && errJson.error && errJson.error.message) {
-        errorDetail = errJson.error.message;
-      }
-    } catch (_) {}
-    throw new Error(`Google API returned HTTP ${response.status} for ${modelName}: ${errorDetail}`);
-  }
-
-  const json = await response.json();
-  const rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!rawText) {
-    throw new Error(`Empty response content from ${modelName}`);
-  }
-
-  return JSON.parse(rawText);
-}
-
-async function synthesizeWithGemini(evidence, apiKey, mode = 'deep', trace = []) {
-  const discovered = await discoverActiveModel(apiKey);
-  const modelsToTry = discovered 
-    ? [discovered, ...CANDIDATE_FLASH_MODELS.filter(m => m !== discovered)]
-    : CANDIDATE_FLASH_MODELS;
+async function synthesizeWithAI(provider, evidence, apiKey, mode = 'deep', trace = []) {
+  const modelsToTry = await getCandidateModelsForProvider(provider, apiKey);
+  const cfg = PROVIDER_CONFIG[provider] || PROVIDER_CONFIG.gemini;
 
   let successfulModel = null;
   let lastError = null;
   let finalGraph = null;
 
   // Filter noise: Datadog RUM, analytics, telemetry
-  const NOISE_PATTERNS_GEMINI = ['ddforward', '_dd.api', '/rum?', 'analytics', 'telemetry', 'beacon', 'bat.bing', 'doubleclick', 'google-analytics'];
+  const NOISE_PATTERNS_AI = ['ddforward', '_dd.api', '/rum?', 'analytics', 'telemetry', 'beacon', 'bat.bing', 'doubleclick', 'google-analytics'];
   const cleanTrace = (trace || []).slice(-30).filter(e => {
     const u = e.url || '';
-    return !NOISE_PATTERNS_GEMINI.some(p => u.includes(p));
+    return !NOISE_PATTERNS_AI.some(p => u.includes(p));
   });
 
   const tracePromptSection = cleanTrace.length > 0 ? `
@@ -912,7 +1119,7 @@ Synthesize a plausible expected journey for this page, modelling the most likely
 `;
 
   if (mode === 'deep') {
-    genBtnText.innerText = 'Pass 1/2: Analysing Session Journey & Identifying Fault Points...';
+    genBtnText.innerText = `Pass 1/2: Analysing Session Journey with ${cfg.shortName}...`;
     const stage1Prompt = `You are Argus: SystemSleuth's Principal Distributed Systems SRE and Session Analyst.
 Argus diagnoses web application issues by building a CUMULATIVE SESSION JOURNEY DAG — a chronological graph of every real action and its causal API chain, exactly as it happened in the real user session.
 
@@ -953,7 +1160,7 @@ Return strictly JSON matching this structure:
     let stage1Result = null;
     for (const model of modelsToTry) {
       try {
-        stage1Result = await callGeminiGenerate(model, stage1Prompt, apiKey);
+        stage1Result = await callAiGenerate(provider, model, stage1Prompt, apiKey);
         successfulModel = model;
         break;
       } catch (err) {
@@ -1016,10 +1223,10 @@ Return strictly JSON matching the Argus 1.0 schema:
   ]
 }`;
 
-    finalGraph = await callGeminiGenerate(successfulModel, stage2Prompt, apiKey);
+    finalGraph = await callAiGenerate(provider, successfulModel, stage2Prompt, apiKey);
 
   } else {
-    genBtnText.innerText = 'Consulting Gemini Journey Analyst...';
+    genBtnText.innerText = `Consulting ${cfg.shortName} Journey Analyst...`;
     const singlePrompt = `You are Argus: SystemSleuth's Principal Distributed Systems SRE and Session Analyst.
 Analyze the following session trace and page evidence and synthesize a CUMULATIVE SESSION JOURNEY DAG — a chronological graph of every real action and its causal API chain.
 
@@ -1043,7 +1250,7 @@ Return strictly valid JSON matching Argus 1.0 schema with graphType "CUMULATIVE_
 
     for (const model of modelsToTry) {
       try {
-        finalGraph = await callGeminiGenerate(model, singlePrompt, apiKey);
+        finalGraph = await callAiGenerate(provider, model, singlePrompt, apiKey);
         successfulModel = model;
         break;
       } catch (err) {
@@ -1056,7 +1263,12 @@ Return strictly valid JSON matching Argus 1.0 schema with graphType "CUMULATIVE_
     }
   }
 
-  return { graph: finalGraph, modelUsed: successfulModel };
+  return { graph: finalGraph, modelUsed: successfulModel, provider };
+}
+
+// Backward compatibility alias
+async function synthesizeWithGemini(evidence, apiKey, mode = 'deep', trace = []) {
+  return await synthesizeWithAI('gemini', evidence, apiKey, mode, trace);
 }
 
 // -------------------------------------------------------------

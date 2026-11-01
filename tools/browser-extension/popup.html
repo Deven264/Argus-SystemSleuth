@@ -120,20 +120,28 @@
     <!-- TAB 4: Settings & Spec -->
     <div class="tab-content hidden" id="tabSettings">
       <div class="card settings-content" style="border: none; padding: 0;">
-        <label for="apiKeyInput" class="input-label">Google Gemini API Key (Optional for Deep AI):</label>
+        <div class="input-row" style="margin-bottom: 8px;">
+          <label for="aiProviderSelect" class="input-label" style="align-self: center; white-space: nowrap;">AI Provider:</label>
+          <select id="aiProviderSelect" class="select-input">
+            <option value="gemini">Google Gemini (Flash 2.5 / 2.0)</option>
+            <option value="claude">Anthropic Claude (3.7 / 3.5 Sonnet)</option>
+            <option value="openai">OpenAI ChatGPT (GPT-4o / 4o-mini)</option>
+          </select>
+        </div>
+        <label for="apiKeyInput" class="input-label" id="apiKeyLabel">Google Gemini API Key (Optional for Deep AI):</label>
         <div class="input-row">
           <input type="password" id="apiKeyInput" placeholder="AIzaSy... (Leave empty for instant offline engine)" />
           <button id="saveKeyBtn" class="btn btn-secondary">Save</button>
         </div>
-        <div class="input-row" style="margin-top: 4px;">
-          <label for="synthesisMode" class="input-label" style="align-self: center;">Synthesis Mode:</label>
+        <div class="input-row" style="margin-top: 8px;">
+          <label for="synthesisMode" class="input-label" style="align-self: center; white-space: nowrap;">Synthesis Mode:</label>
           <select id="synthesisMode" class="select-input">
             <option value="deep">🔬 Deep Multi-Stage (2 Requests: Intent + Failure Matrix)</option>
             <option value="single">⚡ Standard (1 Request: Fast Contract)</option>
           </select>
         </div>
         <div id="apiStatusNotice" class="status-notice hidden"></div>
-        <p class="settings-hint">Without an API key, Argus uses its built-in heuristic behavioral engine (100% offline & instant).</p>
+        <p class="settings-hint" id="settingsHint" style="margin-top: 6px;">Without an API key, Argus uses its built-in heuristic behavioral engine (100% offline & instant).</p>
       </div>
 
       <div style="margin-top: 10px;">
