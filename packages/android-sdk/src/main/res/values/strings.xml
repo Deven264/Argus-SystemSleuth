@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="argus_sdk_name">Argus SDK</string>
+    <string name="argus_diagnose_title">Argus Self-Diagnosis</string>
+    <string name="argus_btn_diagnose">🔬 Diagnose My Problem</string>
+    <string name="argus_btn_diagnosing">Analyzing with AI…</string>
+    <string name="argus_btn_share">💾 Export &amp; Share</string>
+    <string name="argus_hint_complaint">Describe what went wrong (e.g. \"Tapped send, but attachment timed out\")…</string>
+</resources>

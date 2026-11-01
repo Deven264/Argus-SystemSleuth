@@ -42,6 +42,9 @@ dependencies {
     // JSON
     implementation("com.google.code.gson:gson:2.10.1")
 
+    // Argus In-App Self-Diagnosis SDK (Approach D)
+    implementation(project(":argus-sdk"))
+
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 }

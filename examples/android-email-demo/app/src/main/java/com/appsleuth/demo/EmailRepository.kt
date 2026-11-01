@@ -1,6 +1,6 @@
 package com.appsleuth.demo
 
-import com.appsleuth.diagnostic.interceptor.DiagnosticOkHttpInterceptor
+import com.appsleuth.argus.sdk.Argus
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
@@ -30,7 +30,7 @@ class EmailRepository {
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)      // Will timeout before server responds
         .writeTimeout(10, TimeUnit.SECONDS)
-        .addInterceptor(DiagnosticOkHttpInterceptor())   // Diagnostic layer wired in here
+        .addInterceptor(Argus.createOkHttpInterceptor())   // Argus Network Telemetry
         .build()
 
     @Synchronized

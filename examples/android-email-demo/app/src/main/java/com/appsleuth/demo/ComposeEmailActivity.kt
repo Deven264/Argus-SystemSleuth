@@ -1,21 +1,16 @@
 package com.appsleuth.demo
 
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.appsleuth.argus.sdk.Argus
 import com.appsleuth.databinding.ActivityComposeEmailBinding
-import com.appsleuth.diagnostic.DiagnosticSession
-import com.appsleuth.diagnostic.GraphBuilder
-import com.appsleuth.diagnostic.GraphStorageHelper
-import com.appsleuth.diagnostic.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.SocketTimeoutException
-import java.util.UUID
 
 class ComposeEmailActivity : AppCompatActivity() {
 
@@ -35,11 +30,11 @@ class ComposeEmailActivity : AppCompatActivity() {
         }
 
         binding.btnViewGraph.setOnClickListener {
-            GraphStorageHelper.showGraphDialog(this)
+            Argus.showDiagnosticDialog(this)
         }
 
         binding.btnShareGraph.setOnClickListener {
-            GraphStorageHelper.shareGraphFile(this)
+            Argus.showDiagnosticDialog(this)
         }
     }
 
@@ -52,41 +47,15 @@ class ComposeEmailActivity : AppCompatActivity() {
             return
         }
 
-        // Hide any previous diagnostic card
-        binding.cardDiagnostic.visibility = View.GONE
-
-        // Record: user tapped Send
-        GraphBuilder.addNode(
-            GraphNode(
-                id        = UUID.randomUUID().toString(),
-                type      = NodeType.USER_ACTION,
-                label     = "TapSendEmail",
-                timestamp = System.currentTimeMillis(),
-                metadata  = mapOf(
-                    "recipient"      to recipient,
-                    "subject"        to subject,
-                    "hasAttachment"  to true,
-                    "attachmentName" to "report_Q3_2024.pdf"
-                ),
-                outcome   = Outcome.SUCCESS
-            )
+        // Track user action explicitly in Argus SDK
+        Argus.trackAction(
+            "SendEmail",
+            mapOf("recipient" to recipient, "subject" to subject, "attachment" to "report_Q3_2024.pdf")
         )
 
-        // Show loading state
+        binding.cardDiagnostic.visibility = View.GONE
         binding.btnSend.isEnabled = false
         binding.progressBar.visibility = View.VISIBLE
-
-        // Record: entered loading/uploading state
-        GraphBuilder.addNode(
-            GraphNode(
-                id        = UUID.randomUUID().toString(),
-                type      = NodeType.STATE_CHANGE,
-                label     = "StateChange:Uploading",
-                timestamp = System.currentTimeMillis(),
-                metadata  = mapOf("uiState" to "loading"),
-                outcome   = Outcome.PENDING
-            )
-        )
 
         lifecycleScope.launch {
             try {
@@ -97,84 +66,38 @@ class ComposeEmailActivity : AppCompatActivity() {
                 }
 
                 if (success) {
-                    // Record: email sent successfully
-                    GraphBuilder.addNode(
-                        GraphNode(
-                            id        = UUID.randomUUID().toString(),
-                            type      = NodeType.STATE_CHANGE,
-                            label     = "StateChange:EmailSent",
-                            timestamp = System.currentTimeMillis(),
-                            metadata  = mapOf("uiState" to "success"),
-                            outcome   = Outcome.SUCCESS
-                        )
-                    )
-                    Toast.makeText(this@ComposeEmailActivity, "Email sent!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@ComposeEmailActivity, "Email sent successfully!", Toast.LENGTH_SHORT).show()
                     finish()
                 }
 
             } catch (e: SocketTimeoutException) {
-                // Record: timeout failure
-                GraphBuilder.addNode(
-                    GraphNode(
-                        id        = UUID.randomUUID().toString(),
-                        type      = NodeType.STATE_CHANGE,
-                        label     = "StateChange:UploadFailed",
-                        timestamp = System.currentTimeMillis(),
-                        metadata  = mapOf(
-                            "uiState"  to "error",
-                            "reason"   to "upload_timeout",
-                            "expected" to "StateChange:EmailSent"
-                        ),
-                        outcome   = Outcome.TIMEOUT
-                    )
-                )
-
-                // Flush the graph to disk and device Downloads folder
-                val savedLocation = DiagnosticSession.flush(applicationContext)
-                Log.d("AppSleuth", "Graph flushed after timeout. Saved to: $savedLocation")
-
                 withContext(Dispatchers.Main) {
                     binding.progressBar.visibility = View.GONE
                     binding.btnSend.isEnabled = true
-                    
-                    // Show in-app diagnostic action card
-                    binding.tvDiagnosticDesc.text = "Saved to: $savedLocation\nReady to inspect or share."
+
+                    binding.tvDiagnosticDesc.text = "Attachment upload timed out. Tap below to run AI Self-Diagnosis!"
                     binding.cardDiagnostic.visibility = View.VISIBLE
 
                     Toast.makeText(
                         this@ComposeEmailActivity,
-                        "Upload timed out! Graph saved to device.",
+                        "Upload timed out! Shake device or tap View Graph to diagnose.",
                         Toast.LENGTH_LONG
                     ).show()
+
+                    // Auto-open Argus Self-Diagnosis Dialog!
+                    Argus.showDiagnosticDialog(this@ComposeEmailActivity)
                 }
 
             } catch (e: Exception) {
-                GraphBuilder.addNode(
-                    GraphNode(
-                        id        = UUID.randomUUID().toString(),
-                        type      = NodeType.ERROR,
-                        label     = "Error:UnexpectedException",
-                        timestamp = System.currentTimeMillis(),
-                        metadata  = mapOf("error" to e.javaClass.simpleName, "message" to (e.message ?: "unknown")),
-                        outcome   = Outcome.FAILURE
-                    )
-                )
-                val savedLocation = DiagnosticSession.flush(applicationContext)
                 withContext(Dispatchers.Main) {
                     binding.progressBar.visibility = View.GONE
                     binding.btnSend.isEnabled = true
-                    binding.tvDiagnosticDesc.text = "Saved to: $savedLocation"
+                    binding.tvDiagnosticDesc.text = "Error: ${e.message}"
                     binding.cardDiagnostic.visibility = View.VISIBLE
                     Toast.makeText(this@ComposeEmailActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        // Always flush the graph when leaving this screen — captures both success and failure paths
-        DiagnosticSession.flush(applicationContext)
     }
 
     override fun onDestroy() {

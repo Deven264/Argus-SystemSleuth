@@ -16,3 +16,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Argus"
 include(":app")
+include(":argus-sdk")
+project(":argus-sdk").projectDir = file("../../packages/android-sdk")
