@@ -57,11 +57,17 @@ object JourneyGraphBuilder {
             )
         }
 
-        val appName = events.lastOrNull {
-            it.sourceApp.isNotBlank() &&
-            it.sourceApp != "unknown" &&
-            !it.sourceApp.startsWith("com.appsleuth")
-        }?.sourceApp ?: "Target Application"
+        val candidateApps = events.map { it.sourceApp }.filter {
+            it.isNotBlank() &&
+            it != "unknown" &&
+            !it.startsWith("com.appsleuth") &&
+            !it.contains("systemui") &&
+            !it.contains("launcher") &&
+            !it.contains("quicksearchbox")
+        }
+        val appName = candidateApps.groupingBy { it }.eachCount().maxByOrNull { it.value }?.key
+            ?: events.lastOrNull { it.sourceApp.isNotBlank() && !it.sourceApp.startsWith("com.appsleuth") }?.sourceApp
+            ?: "Target Application"
 
         val screenViews = events.filter { it.type == EventType.SCREEN_VIEW }.map { it.label }
         val userActions = events.filter { it.type == EventType.USER_ACTION }.map { it.label }
