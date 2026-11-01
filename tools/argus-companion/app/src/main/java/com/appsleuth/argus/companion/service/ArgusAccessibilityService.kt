@@ -56,8 +56,9 @@ class ArgusAccessibilityService : AccessibilityService() {
                 AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
         info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
         info.notificationTimeout = 100
-        info.flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
-                AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+        // FLAG_RETRIEVE_INTERACTIVE_WINDOWS removed — we only observe events (read-only).
+        // This eliminates the "interact with other apps" permission dialog.
+        info.flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
         serviceInfo = info
     }
 
@@ -114,15 +115,15 @@ class ArgusAccessibilityService : AccessibilityService() {
     }
 
     private fun handleViewClick(event: AccessibilityEvent, pkg: String) {
+        // Note: event.source is not used here since FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+        // is intentionally removed to avoid the "interact with other apps" permission.
         val label = buildString {
             val desc = event.contentDescription?.toString()
             val text = event.text?.joinToString(" ") { it.toString() }?.trim()
-            val viewId = event.source?.viewIdResourceName?.substringAfterLast("/")
 
             when {
                 !desc.isNullOrBlank() -> append(desc)
                 !text.isNullOrBlank() -> append(text)
-                !viewId.isNullOrBlank() -> append(viewId)
                 else -> append("ActionElement")
             }
         }.take(60)

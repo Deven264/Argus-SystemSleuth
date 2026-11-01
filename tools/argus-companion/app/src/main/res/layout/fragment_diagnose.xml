@@ -64,6 +64,16 @@
             android:backgroundTint="@color/argus_highlight"
             app:cornerRadius="6dp" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnExportSession"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginTop="8dp"
+            android:text="💾 Export Session"
+            android:textSize="12sp"
+            android:backgroundTint="@color/argus_highlight"
+            app:cornerRadius="4dp" />
+
         <!-- Progress Indicator -->
         <ProgressBar
             android:id="@+id/progressBar"

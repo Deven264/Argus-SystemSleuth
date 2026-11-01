@@ -11,12 +11,16 @@ import com.appsleuth.argus.companion.R
 import com.appsleuth.argus.companion.databinding.FragmentDiagnoseBinding
 import com.appsleuth.argus.companion.diagnosis.GeminiDiagnosticEngine
 import com.appsleuth.argus.companion.recorder.FlightRecorder
+import com.appsleuth.argus.companion.util.ArgusLogger
+import com.appsleuth.argus.companion.util.ExportManager
 import kotlinx.coroutines.launch
 
 class DiagnoseFragment : Fragment() {
 
     private var _binding: FragmentDiagnoseBinding? = null
     private val binding get() = _binding!!
+
+    private var lastDiagnosisResult: GeminiDiagnosticEngine.DiagnosisResult? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -38,6 +42,30 @@ class DiagnoseFragment : Fragment() {
             }
 
             performDiagnosis(complaint)
+        }
+
+        binding.btnExportSession.setOnClickListener {
+            val events = FlightRecorder.getSnapshot()
+            if (events.isEmpty()) {
+                android.widget.Toast.makeText(requireContext(), "No events captured yet. Use an app first.", android.widget.Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            try {
+                val result = ExportManager.exportSession(
+                    requireContext(), events, lastDiagnosisResult
+                )
+                val msg = buildString {
+                    append("Exported to:\n${result.exportDir}\n\n")
+                    result.traceFile?.let { append("• ${it.name}\n") }
+                    result.graphFile?.let { append("• ${it.name}\n") }
+                    append("\nAccess via USB → Android/data/com.appsleuth.argus.companion/files/argus_exports/")
+                }
+                android.widget.Toast.makeText(requireContext(), "Export complete! See toast for path.", android.widget.Toast.LENGTH_LONG).show()
+                binding.tvUserExplanation.text = msg
+                binding.cardResult.visibility = View.VISIBLE
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(requireContext(), "Export failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -63,6 +91,8 @@ class DiagnoseFragment : Fragment() {
                     apiKey = apiKey
                 )
 
+                lastDiagnosisResult = result
+
                 binding.tvReportEngineBadge.text = result.engine
                 binding.tvUserExplanation.text = result.userFacingExplanation
 
@@ -76,6 +106,7 @@ class DiagnoseFragment : Fragment() {
                     binding.tvDivergedStep.text = result.divergedAtStep
                 }
             } catch (e: Exception) {
+                ArgusLogger.e("DiagnoseFragment", "Diagnosis failed", e)
                 binding.tvUserExplanation.text = "Diagnosis encountered an unexpected issue: ${e.message}\n\nPlease verify network connection or Gemini API key."
             } finally {
                 binding.progressBar.visibility = View.GONE

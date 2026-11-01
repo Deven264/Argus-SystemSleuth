@@ -3,6 +3,7 @@ package com.appsleuth.argus.companion.diagnosis
 import com.appsleuth.argus.companion.graph.JourneyGraphBuilder
 import com.appsleuth.argus.companion.model.FlightEvent
 import com.appsleuth.argus.companion.model.Outcome
+import com.appsleuth.argus.companion.util.ArgusLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -49,6 +50,9 @@ object GeminiDiagnosticEngine {
         val graph = JourneyGraphBuilder.build(events)
         val graphContext = JourneyGraphBuilder.toPromptContext(graph)
 
+        ArgusLogger.i("DiagEngine", "Diagnosis requested. Events: ${events.size}, apiKey present: ${!apiKey.isNullOrBlank()}")
+        ArgusLogger.d("DiagEngine", "Graph: screens=${graph.screenViews.size}, actions=${graph.userActions.size}, apis=${graph.apiCalls.size}, faults=${graph.faultPoints.size}, app=${graph.appName}")
+
         if (!apiKey.isNullOrBlank()) {
             try {
                 return@withContext diagnoseWithGemini(userComplaint, graphContext, graph, apiKey.trim())
@@ -57,6 +61,7 @@ object GeminiDiagnosticEngine {
             }
         }
 
+        ArgusLogger.w("DiagEngine", "Gemini unavailable or failed. Using heuristic fallback.")
         return@withContext heuristicDiagnosis(userComplaint, graph)
     }
 
@@ -94,6 +99,7 @@ Return strictly valid JSON with this EXACT structure:
 
         var lastError: Exception? = null
 
+        ArgusLogger.d("DiagEngine", "Attempting Gemini diagnosis, models to try: $CANDIDATE_MODELS")
         for (model in CANDIDATE_MODELS) {
             try {
                 val jsonBody = JSONObject().apply {
@@ -113,6 +119,7 @@ Return strictly valid JSON with this EXACT structure:
                     .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
                     .build()
 
+                ArgusLogger.d("DiagEngine", "Trying model: $model")
                 httpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
                         throw Exception("Gemini HTTP ${response.code}")
@@ -133,6 +140,7 @@ Return strictly valid JSON with this EXACT structure:
                         .trim()
 
                     val parsed = JSONObject(cleaned)
+                    ArgusLogger.i("DiagEngine", "Gemini success with model=$model, confidence=${parsed.optString("confidence")}")
                     return DiagnosisResult(
                         userFacingExplanation = parsed.optString("userFacingExplanation", "Could not deduce explanation."),
                         technicalRootCause = parsed.optString("technicalRootCause", "Unknown technical cause."),
@@ -143,6 +151,7 @@ Return strictly valid JSON with this EXACT structure:
                 }
             } catch (e: Exception) {
                 lastError = e
+                ArgusLogger.w("DiagEngine", "Model $model failed: ${e.message}")
             }
         }
 
