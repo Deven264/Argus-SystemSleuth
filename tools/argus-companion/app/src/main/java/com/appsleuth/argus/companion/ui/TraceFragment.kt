@@ -10,7 +10,6 @@ import com.appsleuth.argus.companion.R
 import com.appsleuth.argus.companion.databinding.FragmentTraceBinding
 import com.appsleuth.argus.companion.recorder.FlightRecorder
 import com.appsleuth.argus.companion.service.ArgusAccessibilityService
-import com.appsleuth.argus.companion.service.ArgusVpnService
 
 class TraceFragment : Fragment() {
 
@@ -53,18 +52,14 @@ class TraceFragment : Fragment() {
             FlightRecorder.clear()
         }
 
+        // Toggle button opens Accessibility Settings when service is off;
+        // when on, it has no direct stop action (user disables via system settings).
         binding.btnToggleMonitoring.setOnClickListener {
             val activity = requireActivity() as? MainActivity ?: return@setOnClickListener
-            val isMonitoring = ArgusVpnService.isRunning || ArgusAccessibilityService.isRunning
-
-            if (isMonitoring) {
-                activity.stopVpnService()
-            } else {
-                if (!ArgusAccessibilityService.isRunning) {
-                    activity.openAccessibilitySettings()
-                }
-                activity.requestVpnPermission()
+            if (!ArgusAccessibilityService.isRunning) {
+                activity.openAccessibilitySettings()
             }
+            // Button state reflects accessibility service status only
             updateButtonState()
         }
     }
@@ -75,7 +70,7 @@ class TraceFragment : Fragment() {
     }
 
     private fun updateButtonState() {
-        val isMonitoring = ArgusVpnService.isRunning || ArgusAccessibilityService.isRunning
+        val isMonitoring = ArgusAccessibilityService.isRunning
         binding.btnToggleMonitoring.text = if (isMonitoring) {
             getString(R.string.btn_stop_monitoring)
         } else {

@@ -9,8 +9,6 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.appsleuth.argus.companion.R
 import com.appsleuth.argus.companion.databinding.FragmentSettingsBinding
-import com.appsleuth.argus.companion.service.ArgusAccessibilityService
-import com.appsleuth.argus.companion.service.ArgusVpnService
 
 class SettingsFragment : Fragment() {
 
@@ -38,16 +36,6 @@ class SettingsFragment : Fragment() {
             activity?.openAccessibilitySettings()
         }
 
-        binding.btnToggleVpnService.setOnClickListener {
-            val activity = requireActivity() as? MainActivity ?: return@setOnClickListener
-            if (ArgusVpnService.isRunning) {
-                activity.stopVpnService()
-            } else {
-                activity.requestVpnPermission()
-            }
-            updateVpnButtonState()
-        }
-
         binding.btnSaveApiKey.setOnClickListener {
             val key = binding.etSettingsApiKey.text?.toString()?.trim() ?: ""
             prefs.edit().putString("gemini_api_key", key).apply()
@@ -56,19 +44,6 @@ class SettingsFragment : Fragment() {
                 if (key.isNotBlank()) "Gemini API key saved successfully!" else "API key cleared. Offline heuristic mode active.",
                 Toast.LENGTH_SHORT
             ).show()
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        updateVpnButtonState()
-    }
-
-    private fun updateVpnButtonState() {
-        binding.btnToggleVpnService.text = if (ArgusVpnService.isRunning) {
-            "Stop Network Monitor"
-        } else {
-            getString(R.string.btn_open_vpn)
         }
     }
 

@@ -49,31 +49,15 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Live Subsystem Status Pill indicators -->
-        <LinearLayout
+        <!-- Live Subsystem Status indicator -->
+        <TextView
+            android:id="@+id/tvAccessibilityStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="8dp">
-
-            <TextView
-                android:id="@+id/tvAccessibilityStatus"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/status_accessibility_off"
-                android:textColor="@color/argus_text_secondary"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/tvVpnStatus"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/status_vpn_off"
-                android:textColor="@color/argus_text_secondary"
-                android:textSize="12sp" />
-        </LinearLayout>
+            android:layout_marginTop="8dp"
+            android:text="@string/status_accessibility_off"
+            android:textColor="@color/argus_text_secondary"
+            android:textSize="12sp" />
     </LinearLayout>
 
     <!-- Material TabLayout -->
